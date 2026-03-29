@@ -233,7 +233,16 @@ ${expConfig.prompt}
         thinking: { type: "disabled" }
       });
 
-      const response = completion.choices[0]?.message?.content || "你好，欢迎参加面试。请先做个自我介绍。";
+      console.log("API Response:", JSON.stringify(completion, null, 2));
+
+      // 安全提取响应内容
+      let response = "你好，欢迎参加面试。请先做个自我介绍。";
+      if (completion && completion.choices && completion.choices[0] && completion.choices[0].message) {
+        response = completion.choices[0].message.content || response;
+      } else if (completion && completion.error) {
+        console.error("API Error:", completion.error);
+        return NextResponse.json({ success: false, error: `API错误: ${completion.error.message || JSON.stringify(completion.error)}` }, { status: 500 });
+      }
 
       return NextResponse.json({
         success: true,
@@ -277,7 +286,16 @@ ${expConfig.prompt}
         thinking: { type: "disabled" }
       });
 
-      const response = completion.choices[0]?.message?.content || "感谢你的回答。";
+      console.log("Chat API Response:", JSON.stringify(completion, null, 2));
+
+      // 安全提取响应内容
+      let response = "感谢你的回答。";
+      if (completion && completion.choices && completion.choices[0] && completion.choices[0].message) {
+        response = completion.choices[0].message.content || response;
+      } else if (completion && completion.error) {
+        console.error("Chat API Error:", completion.error);
+        return NextResponse.json({ success: false, error: `API错误: ${completion.error.message || JSON.stringify(completion.error)}` }, { status: 500 });
+      }
 
       // 添加回复到历史
       const finalHistory = [...updatedHistory, { role: "assistant", content: response }];
