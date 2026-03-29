@@ -157,20 +157,12 @@ const experienceConfigs: Record<string, { difficulty: string; label: string; pro
   }
 };
 
-// 会话存储
-const sessions = new Map<string, {
-  industry: string;
-  position: string;
-  userExperience: string;
-  messages: Array<{role: string, content: string}>
-}>();
-
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { action, industry, position, userExperience, message, sessionId } = body;
+    const { action, industry, position, userExperience, message, history } = body;
 
-    console.log("API Request:", { action, industry, position, userExperience, sessionId });
+    console.log("API Request:", { action, industry, position, userExperience, historyLength: history?.length });
 
     // 动态导入SDK
     const ZAI = (await import("z-ai-web-dev-sdk")).default;
@@ -225,7 +217,8 @@ ${expConfig.prompt}
 现在开始面试，请用中文简短开场（不超过80字），欢迎候选人并请其做自我介绍。`;
 
       const messages = [
-        { role: "assistant", content: systemPrompt },
+        { role: "user", content: systemPrompt },
+        { role: "assistant", content: "好的，我准备好了。" },
         { role: "user", content: "请开始面试。" }
       ];
 
@@ -235,56 +228,42 @@ ${expConfig.prompt}
       });
 
       const response = completion.choices[0]?.message?.content || "你好，欢迎参加面试。请先做个自我介绍。";
-      const newSessionId = `${industry}-${position}-${userExperience}-${Date.now()}`;
-
-      sessions.set(newSessionId, {
-        industry,
-        position,
-        userExperience,
-        messages: [
-          { role: "assistant", content: systemPrompt },
-          { role: "user", content: "请开始面试。" },
-          { role: "assistant", content: response }
-        ]
-      });
-
-      console.log("Session created:", newSessionId);
 
       return NextResponse.json({
         success: true,
         message: response,
-        sessionId: newSessionId
+        history: [
+          { role: "user", content: systemPrompt },
+          { role: "assistant", content: "好的，我准备好了。" },
+          { role: "user", content: "请开始面试。" },
+          { role: "assistant", content: response }
+        ]
       });
     }
 
     // 继续对话
     if (action === "chat") {
-      if (!sessionId) {
-        return NextResponse.json({ success: false, error: "缺少sessionId" }, { status: 400 });
-      }
-
-      const session = sessions.get(sessionId);
-      if (!session) {
-        return NextResponse.json({ success: false, error: "会话不存在，请重新开始" }, { status: 400 });
+      if (!history || !Array.isArray(history)) {
+        return NextResponse.json({ success: false, error: "缺少对话历史" }, { status: 400 });
       }
 
       if (!message) {
         return NextResponse.json({ success: false, error: "缺少消息内容" }, { status: 400 });
       }
 
-      // 添加用户消息
-      session.messages.push({ role: "user", content: message });
+      // 添加用户消息到历史
+      const updatedHistory = [...history, { role: "user", content: message }];
 
       // 检查是否结束（超过18条消息，约9轮对话）
-      const shouldEnd = session.messages.length >= 18;
+      const shouldEnd = updatedHistory.length >= 18;
 
       // 如果要结束，在最后一条用户消息后添加提示
       const messagesToSend = shouldEnd
         ? [
-            ...session.messages.slice(0, -1),
+            ...updatedHistory.slice(0, -1),
             { role: "user", content: `${message}\n\n[系统提示：这是最后一轮对话，请在回复后总结面试表现并给出改进建议，然后结束面试。]` }
           ]
-        : session.messages;
+        : updatedHistory;
 
       // 调用LLM
       const completion = await zai.chat.completions.create({
@@ -294,16 +273,16 @@ ${expConfig.prompt}
 
       const response = completion.choices[0]?.message?.content || "感谢你的回答。";
 
-      // 保存回复
-      session.messages.push({ role: "assistant", content: response });
+      // 添加回复到历史
+      const finalHistory = [...updatedHistory, { role: "assistant", content: response }];
 
-      console.log("Chat completed, message count:", session.messages.length);
+      console.log("Chat completed, message count:", finalHistory.length);
 
       return NextResponse.json({
         success: true,
         message: response,
         ended: shouldEnd,
-        sessionId
+        history: finalHistory
       });
     }
 

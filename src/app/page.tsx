@@ -152,6 +152,12 @@ interface Message {
   timestamp: Date;
 }
 
+// API历史消息类型
+interface HistoryMessage {
+  role: "user" | "assistant";
+  content: string;
+}
+
 // 面试阶段
 type InterviewStage = "industry" | "category" | "position" | "experience" | "interview" | "ended";
 
@@ -165,7 +171,7 @@ export default function MockInterviewPage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [chatHistory, setChatHistory] = useState<HistoryMessage[]>([]);
   const [hoveredIndustry, setHoveredIndustry] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -219,7 +225,7 @@ export default function MockInterviewPage() {
       const data = await response.json();
 
       if (data.success) {
-        setSessionId(data.sessionId);
+        setChatHistory(data.history);
         setMessages([{ id: Date.now().toString(), role: "assistant", content: data.message, timestamp: new Date() }]);
       } else {
         setMessages([{ id: Date.now().toString(), role: "assistant", content: `面试开始遇到问题：${data.error}`, timestamp: new Date() }]);
@@ -244,15 +250,21 @@ export default function MockInterviewPage() {
       const response = await fetch("/api/interview", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "chat", industry: selectedIndustry, position: selectedPosition, userExperience: selectedExperience, message: userMessage.content, sessionId })
+        body: JSON.stringify({ 
+          action: "chat", 
+          message: userMessage.content, 
+          history: chatHistory 
+        })
       });
 
       const data = await response.json();
 
       if (data.success) {
+        setChatHistory(data.history);
         setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), role: "assistant", content: data.message, timestamp: new Date() }]);
         if (data.ended) setStage("ended");
-        if (data.sessionId) setSessionId(data.sessionId);
+      } else {
+        setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), role: "assistant", content: `发生错误：${data.error}`, timestamp: new Date() }]);
       }
     } catch {
       setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), role: "assistant", content: "网络连接出现问题，请重试。", timestamp: new Date() }]);
@@ -270,7 +282,7 @@ export default function MockInterviewPage() {
     setSelectedExperience(null);
     setMessages([]);
     setInputValue("");
-    setSessionId(null);
+    setChatHistory([]);
   };
 
   // 获取信息
