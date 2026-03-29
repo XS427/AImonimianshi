@@ -157,11 +157,17 @@ const experienceConfigs: Record<string, { difficulty: string; label: string; pro
   }
 };
 
-// SDK配置 - 使用环境变量或默认配置
-const getSDKConfig = () => ({
-  baseUrl: process.env.Z_AI_BASE_URL || "https://open.bigmodel.cn/api/paas/v4",
-  apiKey: process.env.Z_AI_API_KEY || "27bbd80fdeb14d98b22d0b51de850c0b.ZcFZOkplWxmYzAmG"
-});
+// SDK配置 - 必须通过环境变量配置API Key
+const getSDKConfig = () => {
+  const apiKey = process.env.Z_AI_API_KEY;
+  if (!apiKey) {
+    throw new Error("缺少环境变量 Z_AI_API_KEY，请在Netlify控制台配置");
+  }
+  return {
+    baseUrl: process.env.Z_AI_BASE_URL || "https://open.bigmodel.cn/api/paas/v4",
+    apiKey
+  };
+};
 
 export async function POST(request: NextRequest) {
   try {
