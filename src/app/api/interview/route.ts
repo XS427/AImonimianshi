@@ -157,6 +157,12 @@ const experienceConfigs: Record<string, { difficulty: string; label: string; pro
   }
 };
 
+// SDK配置 - 使用环境变量或默认配置
+const getSDKConfig = () => ({
+  baseUrl: process.env.Z_AI_BASE_URL || "https://open.bigmodel.cn/api/paas/v4",
+  apiKey: process.env.Z_AI_API_KEY || "sk-1c72af143be642a48bc17a719dbe570b"
+});
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -164,9 +170,9 @@ export async function POST(request: NextRequest) {
 
     console.log("API Request:", { action, industry, position, userExperience, historyLength: history?.length });
 
-    // 动态导入SDK
+    // 动态导入SDK并直接实例化（绕过配置文件）
     const ZAI = (await import("z-ai-web-dev-sdk")).default;
-    const zai = await ZAI.create();
+    const zai = new ZAI(getSDKConfig());
 
     // 开始面试
     if (action === "start") {
