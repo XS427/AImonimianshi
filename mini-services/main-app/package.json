@@ -1,0 +1,7 @@
+{
+  "name": "main-app",
+  "version": "1.0.0",
+  "scripts": {
+    "dev": "cd /home/z/my-project && bun .next/standalone/server.js"
+  }
+}
